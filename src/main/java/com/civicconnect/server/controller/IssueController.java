@@ -18,18 +18,61 @@ public class IssueController {
         this.issueService = issueService;
     }
 
-    /**
-     * POST /api/issues
-     * 
-     * MOCK AUTHENTICATION:
-     * Using "X-User-Id" header temporarily until Spring Security is set up.
-     */
+    @GetMapping("/{id}")
+    public ResponseEntity<IssueResponse> getIssue(@PathVariable Integer id) {
+        IssueResponse response = issueService.getIssue(id);
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping
     public ResponseEntity<IssueResponse> createIssue(
             @RequestHeader("X-User-Id") String userId,
             @Valid @RequestBody IssueCreateRequest request) {
             
+        // We temporarily use X-User-Id until Spring Security JWT is set up
         IssueResponse response = issueService.createIssue(userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    // ── Accountability State Machine Endpoints ────────────────────────────────
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<IssueResponse> updateStatus(
+            @RequestHeader("X-User-Id") String userId,
+            @PathVariable Integer id,
+            @Valid @RequestBody com.civicconnect.server.dto.request.IssueStatusUpdateRequest request) {
+            
+        IssueResponse response = issueService.updateStatus(userId, id, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/{id}/resolve")
+    public ResponseEntity<IssueResponse> submitResolution(
+            @RequestHeader("X-User-Id") String userId,
+            @PathVariable Integer id,
+            @Valid @RequestBody com.civicconnect.server.dto.request.IssueResolveRequest request) {
+            
+        IssueResponse response = issueService.submitResolution(userId, id, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/{id}/verify")
+    public ResponseEntity<IssueResponse> verifyResolution(
+            @RequestHeader("X-User-Id") String userId,
+            @PathVariable Integer id,
+            @Valid @RequestBody com.civicconnect.server.dto.request.IssueVerifyRequest request) {
+            
+        IssueResponse response = issueService.verifyResolution(userId, id, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/{id}/confirm")
+    public ResponseEntity<IssueResponse> confirmResolution(
+            @RequestHeader("X-User-Id") String userId,
+            @PathVariable Integer id,
+            @Valid @RequestBody com.civicconnect.server.dto.request.IssueVerifyRequest request) {
+            
+        IssueResponse response = issueService.confirmResolution(userId, id, request);
+        return ResponseEntity.ok(response);
     }
 }
