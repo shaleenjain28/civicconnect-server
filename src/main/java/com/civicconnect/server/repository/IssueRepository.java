@@ -2,14 +2,21 @@ package com.civicconnect.server.repository;
 
 import com.civicconnect.server.entity.Issue;
 import com.civicconnect.server.entity.enums.IssueStatus;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
 
 /**
  * IssueRepository — Data Access Layer for Issues
  */
 @Repository
 public interface IssueRepository extends JpaRepository<Issue, Integer> {
+
+    // ── Pre-fetch relationships to prevent N+1 queries in IssueResponse.from() ──
+    @EntityGraph(attributePaths = {"department", "user", "assignedTo", "verifiedBy"})
+    Optional<Issue> findById(Integer id);
 
     // ── The answer to my question ─────────────────────────────────────────────
     // Spring Data JPA reads "countBy", then looks at the fields "UserId" and "Status".
