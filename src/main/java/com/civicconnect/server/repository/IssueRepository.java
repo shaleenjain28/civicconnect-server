@@ -36,5 +36,13 @@ public interface IssueRepository extends JpaRepository<Issue, Integer> {
     // findTop50          → LIMIT 50
     // ByDepartmentId     → WHERE department_id = ?
     // OrderByUrgencyScoreDesc → ORDER BY urgency_score DESC
-    java.util.List<Issue> findTop50ByDepartmentIdOrderByUrgencyScoreDesc(Integer departmentId);
+    // ── Phase 3: Bounding Box Query for Geolocation ───────────────────────────
+    // We use a bounding box (Between) to pre-filter rows in the DB fast,
+    // then we will apply the exact Haversine mathematical filter in Java.
+    @EntityGraph(attributePaths = {"department", "user"})
+    java.util.List<Issue> findByLatitudeBetweenAndLongitudeBetweenAndStatusNot(
+            Double minLat, Double maxLat, 
+            Double minLon, Double maxLon, 
+            IssueStatus excludedStatus
+    );
 }
