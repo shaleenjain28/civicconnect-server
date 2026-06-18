@@ -320,6 +320,66 @@ public class IssueService {
         notificationRepository.save(notification);
     }
 
+    // ── Phase 3: Geolocation Queries ──────────────────────────────────────────
+
+    /**
+     * Finds unresolved issues within a specific radius of a user's location.
+     * Uses a bounding box pre-filter on the DB, then exactly calculates 
+     * distance using the Haversine formula in memory.
+     */
+    @Transactional(readOnly = true)
+    public java.util.List<IssueResponse> getNearbyIssues(double userLat, double userLon, double radiusMeters, int limit) {
+        // 1. Calculate Bounding Box
+        // 1 degree latitude ~ 111,320 meters
+        double metersPerDegreeLat = 111320.0;
+        double deltaLat = radiusMeters / metersPerDegreeLat;
+        
+        // Longitude distance shrinks as we move away from the equator
+        double cosLat = Math.cos(Math.toRadians(userLat));
+        if (cosLat == 0) cosLat = 0.000001; // prevent divide by zero
+        double deltaLon = radiusMeters / (metersPerDegreeLat * cosLat);
+
+        double minLat = userLat - deltaLat;
+        double maxLat = userLat + deltaLat;
+        double minLon = userLon - deltaLon;
+        double maxLon = userLon + deltaLon;
+
+        // 2. Fetch superset from DB (only pending/in-progress issues)
+        java.util.List<Issue> candidateIssues = issueRepository.findByLatitudeBetweenAndLongitudeBetweenAndStatusNot(
+                minLat, maxLat, minLon, maxLon, IssueStatus.RESOLVED);
+
+        // 3. Apply exact Haversine filter and map to DTO
+        return candidateIssues.stream()
+                .map(issue -> {
+                    double distance = calculateHaversineDistance(userLat, userLon, issue.getLatitude(), issue.getLongitude());
+                    IssueResponse res = IssueResponse.from(issue);
+                    res.setDistanceMeters(distance);
+                    return res;
+                })
+                .filter(res -> res.getDistanceMeters() <= radiusMeters)
+                // Sort by Urgency Score DESC, then Distance ASC
+                .sorted(java.util.Comparator
+                        .comparing(IssueResponse::getUrgencyScore).reversed()
+                        .thenComparing(IssueResponse::getDistanceMeters))
+                .limit(limit)
+                .toList();
+    }
+
+    private double calculateHaversineDistance(double lat1, double lon1, double lat2, double lon2) {
+        final int EARTH_RADIUS_METERS = 6371000;
+        
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                   Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                   Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                   
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        
+        return EARTH_RADIUS_METERS * c;
+    }
+
     // ── Helper Methods (Will be moved to a dedicated service later) ───────────
 
     private LocalDateTime calculateDeadline(Criticality criticality) {
