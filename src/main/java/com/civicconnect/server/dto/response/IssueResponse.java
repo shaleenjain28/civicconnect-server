@@ -31,6 +31,7 @@ public class IssueResponse {
     private double latitude;
     private double longitude;
     private String locationText;
+    private Double distanceMeters; // Populated only in nearby queries
     private String imageUrl;
     
     private int upvoteCount;
