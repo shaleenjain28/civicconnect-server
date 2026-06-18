@@ -35,6 +35,19 @@ public class IssueController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    // ── Queries ───────────────────────────────────────────────────────────────
+
+    @GetMapping("/nearby")
+    public ResponseEntity<java.util.List<IssueResponse>> getNearbyIssues(
+            @RequestParam double lat,
+            @RequestParam double lon,
+            @RequestParam(defaultValue = "5000") double radius,
+            @RequestParam(defaultValue = "50") int limit) {
+            
+        java.util.List<IssueResponse> response = issueService.getNearbyIssues(lat, lon, radius, limit);
+        return ResponseEntity.ok(response);
+    }
+
     // ── Accountability State Machine Endpoints ────────────────────────────────
 
     @PatchMapping("/{id}/status")
