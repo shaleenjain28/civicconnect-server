@@ -387,19 +387,56 @@ public class IssueService {
         return switch (criticality) {
             case CRITICAL -> now.plusDays(1);
             case HIGH -> now.plusDays(3);
-            case MEDIUM -> now.plusDays(7);
-            case LOW -> now.plusDays(14);
+            case MEDIUM, LOW -> now.plusDays(7);
         };
     }
 
     private int calculateUrgencyScore(int upvotes, Criticality criticality, String deptSlug, LocalDateTime deadline) {
-        int baseScore = switch (criticality) {
-            case CRITICAL -> 80;
-            case HIGH -> 50;
-            case MEDIUM -> 20;
-            case LOW -> 10;
+        // Base: upvotes * 10
+        int score = upvotes * 10;
+        
+        // Criticality weight
+        score += switch (criticality) {
+            case CRITICAL -> 200;
+            case HIGH -> 150;
+            case MEDIUM -> 100;
+            case LOW -> 50;
         };
-        // Simple formula: base score + (upvotes * 2)
-        return baseScore + (upvotes * 2);
+        
+        // Department weight (safety-critical first)
+        if (deptSlug != null) {
+            score += switch (deptSlug.toLowerCase()) {
+                case "water-sewerage", "electricity-lighting" -> 150;
+                case "public-works-roads", "sanitation-waste" -> 100;
+                case "parks-public-spaces" -> 80;
+                default -> 100;
+            };
+        } else {
+            score += 100;
+        }
+        
+        // Deadline penalty
+        if (deadline != null) {
+            // Use epoch milliseconds to do math
+            long now = java.time.Instant.now().toEpochMilli();
+            long deadlineMs = deadline.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+            
+            // Replicate the Express logic: Assume it was created 7 days before deadline for percentage calculation
+            long createdEstimate = deadlineMs - (7L * 24 * 60 * 60 * 1000);
+            long total = deadlineMs - createdEstimate;
+            long elapsed = now - createdEstimate;
+            
+            double pct = (double) elapsed / total;
+            
+            if (pct > 1.0) {
+                score += 200; // Overdue
+            } else if (pct > 0.8) {
+                score += 100; // >80% elapsed
+            } else if (pct > 0.5) {
+                score += 50;  // >50% elapsed
+            }
+        }
+        
+        return Math.max(0, score);
     }
 }
