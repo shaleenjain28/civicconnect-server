@@ -10,7 +10,9 @@ import com.civicconnect.server.dto.request.HodUpdateRequest;
 import com.civicconnect.server.dto.response.DepartmentResponse;
 import com.civicconnect.server.dto.response.HodResponse;
 import com.civicconnect.server.entity.Department;
+import com.civicconnect.server.entity.enums.IssueStatus;
 import com.civicconnect.server.repository.DepartmentRepository;
+import com.civicconnect.server.repository.IssueRepository;
 
 /**
  * DepartmentService — Business Logic Layer
@@ -54,10 +56,11 @@ import com.civicconnect.server.repository.DepartmentRepository;
 public class DepartmentService {
 
     private final DepartmentRepository departmentRepository;
+    private final IssueRepository issueRepository;
 
-    // Constructor injection — Spring automatically wires DepartmentRepository here
-    public DepartmentService(DepartmentRepository departmentRepository) {
+    public DepartmentService(DepartmentRepository departmentRepository, IssueRepository issueRepository) {
         this.departmentRepository = departmentRepository;
+        this.issueRepository = issueRepository;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -237,7 +240,23 @@ public class DepartmentService {
      * optimization.
      */
     private DepartmentResponse toResponse(Department dept) {
-        return DepartmentResponse.from(dept);
-        // TODO: set issue counts from IssueRepository once it's built
+        DepartmentResponse res = DepartmentResponse.from(dept);
+        
+        // ── Phase 3: Real Database Counts ─────────────────────────────────────────
+        // We query the IssueRepository to get the exact counts for this department.
+        // Note: This still causes N+1 queries if we load all departments, 
+        // but since there are only 5 departments, executing 10 fast COUNT queries 
+        // is acceptable for now. A true optimization would use a GROUP BY native query.
+        
+        long pending = issueRepository.countByDepartmentIdAndStatus(dept.getId(), IssueStatus.PENDING);
+        long inProgress = issueRepository.countByDepartmentIdAndStatus(dept.getId(), IssueStatus.IN_PROGRESS);
+        long resolved = issueRepository.countByDepartmentIdAndStatus(dept.getId(), IssueStatus.RESOLVED);
+        
+        res.setPendingCount(pending);
+        res.setInProgressCount(inProgress);
+        res.setResolvedCount(resolved);
+        res.setTotalIssues(pending + inProgress + resolved);
+        
+        return res;
     }
 }
